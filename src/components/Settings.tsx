@@ -5,6 +5,7 @@ import { ConfigService, AppConfig, NotificationRule } from '../services/configSe
 import { GraylogService } from '../services/graylogService';
 import { AIService } from '../services/aiService';
 import { useToast } from '@/hooks/use-toast';
+import { showRestartNotification } from '../utils/devServerUtils';
 
 const Settings = () => {
   const [config, setConfig] = useState<AppConfig>(ConfigService.loadConfig());
@@ -135,7 +136,15 @@ const Settings = () => {
 
   const saveConfig = () => {
     try {
+      const previousGraylogUrl = ConfigService.loadConfig().graylog.url;
       ConfigService.saveConfig(config);
+      
+      // Se l'URL di Graylog è cambiato, mostra la notifica di riavvio
+      if (config.graylog.url !== previousGraylogUrl) {
+        showRestartNotification();
+        sessionStorage.setItem('graylog_proxy_url', config.graylog.url);
+      }
+      
       toast({
         title: "Configurazione salvata",
         description: "Le impostazioni sono state salvate con successo",
