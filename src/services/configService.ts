@@ -10,6 +10,7 @@ export interface AppConfig {
     url: string;
     apiKey: string;
     model: string;
+    language: string;
   };
   notifications: {
     email: {
@@ -44,7 +45,8 @@ const DEFAULT_CONFIG: AppConfig = {
   openwebui: {
     url: 'http://localhost:3000',
     apiKey: '',
-    model: 'llama3.1'
+    model: 'llama3.1',
+    language: 'italian'
   },
   notifications: {
     email: {

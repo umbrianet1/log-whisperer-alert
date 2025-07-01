@@ -197,7 +197,7 @@ const Settings = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
-              <div className="md:col-span-2">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Modello AI</label>
                 <select
                   value={config.openwebui.model}
@@ -208,6 +208,20 @@ const Settings = () => {
                   <option value="llama3.2">Llama 3.2</option>
                   <option value="mistral">Mistral</option>
                   <option value="codellama">CodeLlama</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Lingua AI</label>
+                <select
+                  value={config.openwebui.language}
+                  onChange={(e) => handleInputChange('openwebui', 'language', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="italian">Italiano</option>
+                  <option value="english">English</option>
+                  <option value="spanish">Español</option>
+                  <option value="french">Français</option>
+                  <option value="german">Deutsch</option>
                 </select>
               </div>
             </div>

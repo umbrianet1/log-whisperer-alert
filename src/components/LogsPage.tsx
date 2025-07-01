@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Play, Pause, RefreshCw } from 'lucide-react';
+import { GraylogService } from '../services/graylogService';
+import { ConfigService } from '../services/configService';
 
 interface LogEntry {
   id: string;
@@ -12,53 +14,19 @@ interface LogEntry {
 }
 
 const LogsPage = () => {
-  const [logs, setLogs] = useState<LogEntry[]>([
-    {
-      id: '1',
-      timestamp: '2024-07-01 14:35:22',
-      host: 'web-server-01',
-      level: 'ERROR',
-      message: 'Connection timeout to database pool after 30 seconds',
-      source: 'application'
-    },
-    {
-      id: '2',
-      timestamp: '2024-07-01 14:35:20',
-      host: 'web-server-01',
-      level: 'WARN',
-      message: 'High memory usage detected: 89% of available memory in use',
-      source: 'system'
-    },
-    {
-      id: '3',
-      timestamp: '2024-07-01 14:35:18',
-      host: 'api-gateway',
-      level: 'INFO',
-      message: 'Rate limit exceeded for IP 192.168.1.100 - temporarily blocked',
-      source: 'security'
-    },
-    {
-      id: '4',
-      timestamp: '2024-07-01 14:35:15',
-      host: 'db-server-02',
-      level: 'ERROR',
-      message: 'Failed authentication attempt from user "admin" - invalid password',
-      source: 'auth'
-    },
-    {
-      id: '5',
-      timestamp: '2024-07-01 14:35:12',
-      host: 'load-balancer',
-      level: 'INFO',
-      message: 'Health check successful for all backend servers',
-      source: 'health'
-    }
-  ]);
-
-  const [isLive, setIsLive] = useState(true);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [isLive, setIsLive] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLevel, setSelectedLevel] = useState('all');
   const [selectedHost, setSelectedHost] = useState('all');
+  const [graylogService, setGraylogService] = useState<GraylogService | null>(null);
+  const [stopStreaming, setStopStreaming] = useState<(() => void) | null>(null);
+
+  useEffect(() => {
+    const config = ConfigService.loadConfig();
+    const service = new GraylogService(config.graylog);
+    setGraylogService(service);
+  }, []);
 
   const filteredLogs = logs.filter(log => {
     const matchesSearch = log.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -82,25 +50,63 @@ const LogsPage = () => {
   const uniqueHosts = Array.from(new Set(logs.map(log => log.host)));
   const uniqueLevels = Array.from(new Set(logs.map(log => log.level)));
 
-  // Simulate live log updates
-  useEffect(() => {
-    if (!isLive) return;
+  const startLiveStreaming = async () => {
+    if (!graylogService) return;
 
-    const interval = setInterval(() => {
-      const newLog: LogEntry = {
-        id: Date.now().toString(),
-        timestamp: new Date().toLocaleString(),
-        host: uniqueHosts[Math.floor(Math.random() * uniqueHosts.length)],
-        level: uniqueLevels[Math.floor(Math.random() * uniqueLevels.length)],
-        message: `Simulated log entry - ${Math.random().toString(36).substring(7)}`,
-        source: 'system'
-      };
+    try {
+      const connected = await graylogService.testConnection();
+      if (!connected) {
+        console.error('Cannot connect to Graylog');
+        return;
+      }
+
+      setIsLive(true);
+      const stopFn = await graylogService.streamMessages((message) => {
+        const logEntry: LogEntry = {
+          id: message._id,
+          timestamp: message.timestamp,
+          host: message.host,
+          level: message.level.toString(),
+          message: message.message,
+          source: message.source
+        };
+        
+        setLogs(prev => [logEntry, ...prev.slice(0, 49)]); // Keep only 50 logs
+      });
       
-      setLogs(prev => [newLog, ...prev.slice(0, 49)]); // Keep only 50 logs
-    }, 3000);
+      setStopStreaming(() => stopFn);
+    } catch (error) {
+      console.error('Failed to start streaming:', error);
+    }
+  };
 
-    return () => clearInterval(interval);
-  }, [isLive]);
+  const stopLiveStreaming = () => {
+    if (stopStreaming) {
+      stopStreaming();
+      setStopStreaming(null);
+    }
+    setIsLive(false);
+  };
+
+  const refreshLogs = async () => {
+    if (!graylogService) return;
+
+    try {
+      const messages = await graylogService.getMessages('*', 'PT1H');
+      const logEntries: LogEntry[] = messages.map(message => ({
+        id: message._id,
+        timestamp: message.timestamp,
+        host: message.host,
+        level: message.level.toString(),
+        message: message.message,
+        source: message.source
+      }));
+      
+      setLogs(logEntries);
+    } catch (error) {
+      console.error('Failed to refresh logs:', error);
+    }
+  };
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -113,7 +119,7 @@ const LogsPage = () => {
           
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => setIsLive(!isLive)}
+              onClick={isLive ? stopLiveStreaming : startLiveStreaming}
               className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
                 isLive 
                   ? 'bg-red-600 text-white hover:bg-red-700' 
@@ -121,10 +127,13 @@ const LogsPage = () => {
               }`}
             >
               {isLive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              <span>{isLive ? 'Pause' : 'Resume'}</span>
+              <span>{isLive ? 'Pause' : 'Start'}</span>
             </button>
             
-            <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <button 
+              onClick={refreshLogs}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
               <RefreshCw className="w-4 h-4" />
               <span>Refresh</span>
             </button>
@@ -182,7 +191,7 @@ const LogsPage = () => {
         <div className="flex items-center space-x-3">
           <div className={`w-3 h-3 rounded-full ${isLive ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`}></div>
           <span className="text-sm text-gray-600">
-            {isLive ? 'Live stream active' : 'Stream paused'} • {filteredLogs.length} entries
+            {isLive ? 'Live stream active' : 'Stream stopped'} • {filteredLogs.length} entries
           </span>
         </div>
       </div>
@@ -213,7 +222,7 @@ const LogsPage = () => {
           
           {filteredLogs.length === 0 && (
             <div className="p-8 text-center text-gray-500">
-              <p>No logs match your current filters</p>
+              <p>No logs available. Configure Graylog connection in Settings and click Start.</p>
             </div>
           )}
         </div>

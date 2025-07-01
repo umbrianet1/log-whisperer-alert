@@ -3,6 +3,7 @@ interface OpenWebUIConfig {
   url: string;
   apiKey: string;
   model: string;
+  language: string;
 }
 
 export interface LogAnalysisResult {
@@ -37,8 +38,24 @@ export class AIService {
     }
   }
 
+  private getLanguagePrompt(): string {
+    const languageInstructions = {
+      'italian': 'Rispondi sempre in italiano. Analizza questo messaggio di log e fornisci suggerimenti in italiano.',
+      'english': 'Always respond in English. Analyze this log message and provide suggestions in English.',
+      'spanish': 'Responde siempre en español. Analiza este mensaje de log y proporciona sugerencias en español.',
+      'french': 'Réponds toujours en français. Analyse ce message de log et fournis des suggestions en français.',
+      'german': 'Antworte immer auf Deutsch. Analysiere diese Log-Nachricht und gib Vorschläge auf Deutsch.'
+    };
+
+    return languageInstructions[this.config.language as keyof typeof languageInstructions] || languageInstructions['english'];
+  }
+
   async analyzeLog(logMessage: string, host: string, timestamp: string): Promise<LogAnalysisResult> {
+    const languageInstruction = this.getLanguagePrompt();
+    
     const prompt = `
+${languageInstruction}
+
 Analyze this log message for potential security issues, errors, or anomalies:
 
 Host: ${host}
@@ -67,7 +84,7 @@ Format your response as JSON with keys: isAnomalous, severity, summary, suggesti
           messages: [
             {
               role: 'system',
-              content: 'You are a cybersecurity expert analyzing log files. Respond only with valid JSON.'
+              content: `You are a cybersecurity expert analyzing log files. ${languageInstruction} Respond only with valid JSON.`
             },
             {
               role: 'user',
