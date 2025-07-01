@@ -1,101 +1,129 @@
-interface GraylogConfig {
+
+export interface GraylogConfig {
   url: string;
   username: string;
   password: string;
   apiToken: string;
 }
 
-interface GraylogMessage {
-  _id: string;
+export interface GraylogMessage {
   timestamp: string;
-  source: string;
   message: string;
+  full_message: string;
+  host: string;
   level: number;
   facility: string;
-  host: string;
-  full_message: string;
+  source: string;
 }
 
 export class GraylogService {
   private config: GraylogConfig;
-  private authHeader: string;
 
   constructor(config: GraylogConfig) {
     this.config = config;
-    this.authHeader = config.apiToken 
-      ? `Bearer ${config.apiToken}`
-      : `Basic ${btoa(`${config.username}:${config.password}`)}`;
+  }
+
+  private getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Requested-By': 'LogGuard-AI'
+    };
+
+    // Usa API token se disponibile, altrimenti username/password
+    if (this.config.apiToken && this.config.apiToken.trim() !== '') {
+      headers['Authorization'] = `Bearer ${this.config.apiToken}`;
+    } else if (this.config.username && this.config.password) {
+      const credentials = btoa(`${this.config.username}:${this.config.password}`);
+      headers['Authorization'] = `Basic ${credentials}`;
+    }
+
+    return headers;
   }
 
   async testConnection(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.config.url}/api/system`, {
-        method: 'GET',
-        headers: {
-          'Authorization': this.authHeader,
-          'Content-Type': 'application/json',
-          'X-Requested-By': 'LogGuard-AI'
-        }
-      });
+      console.log('Testing Graylog connection via proxy...');
       
-      return response.ok;
+      // Usa il proxy invece dell'URL diretto
+      const response = await fetch('/api/graylog/system', {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      console.log('Graylog response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Graylog system info:', data);
+        return true;
+      }
+      
+      console.error('Graylog connection failed:', response.status, response.statusText);
+      return false;
     } catch (error) {
-      console.error('Graylog connection test failed:', error);
+      console.error('Error testing Graylog connection:', error);
       return false;
     }
   }
 
-  async getMessages(query: string = '*', timeRange: string = 'PT1H'): Promise<GraylogMessage[]> {
+  async searchMessages(query: string = '*', timeRange: number = 300): Promise<GraylogMessage[]> {
     try {
-      const params = new URLSearchParams({
+      const searchParams = new URLSearchParams({
         query,
-        range: timeRange,
-        limit: '100',
+        range: timeRange.toString(),
+        limit: '50',
         sort: 'timestamp:desc'
       });
 
-      const response = await fetch(`${this.config.url}/api/search/universal/relative?${params}`, {
+      const response = await fetch(`/api/graylog/search/universal/relative?${searchParams}`, {
         method: 'GET',
-        headers: {
-          'Authorization': this.authHeader,
-          'Content-Type': 'application/json',
-          'X-Requested-By': 'LogGuard-AI'
-        }
+        headers: this.getAuthHeaders()
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`Search failed: ${response.status}`);
       }
 
       const data = await response.json();
-      return data.messages?.map((msg: any) => ({
-        _id: msg.message._id,
-        timestamp: msg.message.timestamp,
-        source: msg.message.source,
-        message: msg.message.message,
-        level: msg.message.level,
-        facility: msg.message.facility,
-        host: msg.message.host || msg.message.source,
-        full_message: msg.message.full_message || msg.message.message
-      })) || [];
+      return data.messages || [];
     } catch (error) {
-      console.error('Failed to fetch messages from Graylog:', error);
+      console.error('Error searching messages:', error);
       return [];
     }
   }
 
   async streamMessages(callback: (message: GraylogMessage) => void): Promise<() => void> {
-    // Simulazione di streaming - in produzione useresti WebSocket o Server-Sent Events
-    const pollInterval = setInterval(async () => {
-      try {
-        const messages = await this.getMessages('*', 'PT5M');
-        messages.forEach(callback);
-      } catch (error) {
-        console.error('Error in message streaming:', error);
+    console.log('Starting message streaming...');
+    
+    let isStreaming = true;
+    
+    const pollMessages = async () => {
+      while (isStreaming) {
+        try {
+          const messages = await this.searchMessages('*', 60); // Ultimi 60 secondi
+          
+          for (const message of messages) {
+            if (isStreaming) {
+              callback(message);
+            }
+          }
+          
+          // Polling ogni 30 secondi
+          await new Promise(resolve => setTimeout(resolve, 30000));
+        } catch (error) {
+          console.error('Error in streaming:', error);
+          await new Promise(resolve => setTimeout(resolve, 60000)); // Retry dopo 1 minuto
+        }
       }
-    }, 5000); // Poll ogni 5 secondi
+    };
 
-    // Ritorna una funzione per fermare il polling
-    return () => clearInterval(pollInterval);
+    // Avvia il polling
+    pollMessages();
+
+    // Ritorna la funzione per fermare lo streaming
+    return () => {
+      console.log('Stopping message streaming...');
+      isStreaming = false;
+    };
   }
 }
