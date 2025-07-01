@@ -1,46 +1,22 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save, TestTube, Check, AlertCircle } from 'lucide-react';
+import { ConfigService, AppConfig } from '../services/configService';
+import { GraylogService } from '../services/graylogService';
+import { AIService } from '../services/aiService';
+import { useToast } from '@/hooks/use-toast';
 
 const Settings = () => {
-  const [config, setConfig] = useState({
-    graylog: {
-      url: 'https://graylog.example.com:9000',
-      username: 'admin',
-      password: '',
-      apiToken: ''
-    },
-    openwebui: {
-      url: 'http://localhost:3000',
-      apiKey: '',
-      model: 'llama3.1'
-    },
-    notifications: {
-      email: {
-        enabled: true,
-        smtp: 'smtp.gmail.com',
-        port: 587,
-        username: 'alerts@company.com',
-        password: '',
-        recipients: 'admin@company.com, security@company.com'
-      },
-      telegram: {
-        enabled: true,
-        botToken: '',
-        chatId: ''
-      }
-    },
-    alertRules: {
-      cpuThreshold: 85,
-      memoryThreshold: 90,
-      diskThreshold: 95,
-      failedLoginsThreshold: 10
-    }
-  });
-
+  const [config, setConfig] = useState<AppConfig>(ConfigService.loadConfig());
   const [testResults, setTestResults] = useState<{[key: string]: boolean | null}>({});
+  const { toast } = useToast();
 
-  const handleInputChange = (section: string, field: string, value: string | number | boolean) => {
+  useEffect(() => {
+    const loadedConfig = ConfigService.loadConfig();
+    setConfig(loadedConfig);
+  }, []);
+
+  const handleInputChange = (section: keyof AppConfig, field: string, value: string | number | boolean) => {
     setConfig(prev => ({
       ...prev,
       [section]: {
@@ -50,7 +26,7 @@ const Settings = () => {
     }));
   };
 
-  const handleNestedInputChange = (section: string, subsection: string, field: string, value: string | number | boolean) => {
+  const handleNestedInputChange = (section: keyof AppConfig, subsection: string, field: string, value: string | number | boolean) => {
     setConfig(prev => ({
       ...prev,
       [section]: {
@@ -63,27 +39,71 @@ const Settings = () => {
     }));
   };
 
-  const testConnection = async (service: string) => {
-    setTestResults(prev => ({ ...prev, [service]: null }));
+  const testGraylogConnection = async () => {
+    setTestResults(prev => ({ ...prev, graylog: null }));
     
-    // Simulate API test
-    setTimeout(() => {
-      setTestResults(prev => ({ 
-        ...prev, 
-        [service]: Math.random() > 0.3 // 70% success rate for demo
-      }));
-    }, 2000);
+    try {
+      const graylogService = new GraylogService(config.graylog);
+      const result = await graylogService.testConnection();
+      setTestResults(prev => ({ ...prev, graylog: result }));
+      
+      toast({
+        title: result ? "Connessione riuscita" : "Connessione fallita",
+        description: result ? "Graylog è raggiungibile" : "Verifica URL e credenziali",
+        variant: result ? "default" : "destructive"
+      });
+    } catch (error) {
+      setTestResults(prev => ({ ...prev, graylog: false }));
+      toast({
+        title: "Errore di connessione",
+        description: "Impossibile connettersi a Graylog",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const testOpenWebUIConnection = async () => {
+    setTestResults(prev => ({ ...prev, openwebui: null }));
+    
+    try {
+      const aiService = new AIService(config.openwebui);
+      const result = await aiService.testConnection();
+      setTestResults(prev => ({ ...prev, openwebui: result }));
+      
+      toast({
+        title: result ? "Connessione AI riuscita" : "Connessione AI fallita",
+        description: result ? "OpenWebUI è raggiungibile" : "Verifica URL e API key",
+        variant: result ? "default" : "destructive"
+      });
+    } catch (error) {
+      setTestResults(prev => ({ ...prev, openwebui: false }));
+      toast({
+        title: "Errore connessione AI",
+        description: "Impossibile connettersi a OpenWebUI",
+        variant: "destructive"
+      });
+    }
   };
 
   const saveConfig = () => {
-    console.log('Saving configuration:', config);
-    // Here you would save to backend
-    alert('Configuration saved successfully!');
+    try {
+      ConfigService.saveConfig(config);
+      toast({
+        title: "Configurazione salvata",
+        description: "Le impostazioni sono state salvate con successo",
+      });
+    } catch (error) {
+      toast({
+        title: "Errore salvataggio",
+        description: "Impossibile salvare la configurazione",
+        variant: "destructive"
+      });
+    }
   };
 
-  const TestButton = ({ service, label }: { service: string; label: string }) => (
+  const TestButton = ({ service, label, onTest }: { service: string; label: string; onTest: () => void }) => (
     <button
-      onClick={() => testConnection(service)}
+      onClick={onTest}
       className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
     >
       <TestTube className="w-4 h-4" />
@@ -97,27 +117,27 @@ const Settings = () => {
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Configuration</h1>
-          <p className="text-gray-600">Configure your monitoring and notification settings</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Configurazione</h1>
+          <p className="text-gray-600">Configura le connessioni ai servizi esterni e le regole di notifica</p>
         </div>
 
         <div className="space-y-8">
           {/* Graylog Configuration */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-900">Graylog Connection</h2>
-              <TestButton service="graylog" label="Connection" />
+              <h2 className="text-xl font-semibold text-gray-900">Connessione Graylog</h2>
+              <TestButton service="graylog" label="Connessione" onTest={testGraylogConnection} />
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Server URL</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">URL Server</label>
                 <input
                   type="url"
                   value={config.graylog.url}
                   onChange={(e) => handleInputChange('graylog', 'url', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="https://graylog.example.com:9000"
+                  placeholder="http://localhost:9000"
                 />
               </div>
               <div>
@@ -139,7 +159,7 @@ const Settings = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">API Token</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">API Token (opzionale)</label>
                 <input
                   type="password"
                   value={config.graylog.apiToken}
@@ -153,13 +173,13 @@ const Settings = () => {
           {/* OpenWebUI Configuration */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-900">OpenWebUI AI Analysis</h2>
-              <TestButton service="openwebui" label="AI Connection" />
+              <h2 className="text-xl font-semibold text-gray-900">Analisi AI (OpenWebUI)</h2>
+              <TestButton service="openwebui" label="AI" onTest={testOpenWebUIConnection} />
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">OpenWebUI URL</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">URL OpenWebUI</label>
                 <input
                   type="url"
                   value={config.openwebui.url}
@@ -178,16 +198,16 @@ const Settings = () => {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">AI Model</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Modello AI</label>
                 <select
                   value={config.openwebui.model}
                   onChange={(e) => handleInputChange('openwebui', 'model', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="llama3.1">Llama 3.1</option>
-                  <option value="gpt-4">GPT-4</option>
-                  <option value="claude">Claude</option>
+                  <option value="llama3.2">Llama 3.2</option>
                   <option value="mistral">Mistral</option>
+                  <option value="codellama">CodeLlama</option>
                 </select>
               </div>
             </div>
@@ -195,58 +215,12 @@ const Settings = () => {
 
           {/* Notification Settings */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Notification Settings</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">Impostazioni Notifiche</h2>
             
-            {/* Email Settings */}
+            {/* Telegram Settings */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-800">Email Notifications</h3>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={config.notifications.email.enabled}
-                    onChange={(e) => handleNestedInputChange('notifications', 'email', 'enabled', e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Enable</span>
-                </label>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Server</label>
-                  <input
-                    type="text"
-                    value={config.notifications.email.smtp}
-                    onChange={(e) => handleNestedInputChange('notifications', 'email', 'smtp', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Port</label>
-                  <input
-                    type="number"
-                    value={config.notifications.email.port}
-                    onChange={(e) => handleNestedInputChange('notifications', 'email', 'port', parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Recipients (comma separated)</label>
-                  <input
-                    type="text"
-                    value={config.notifications.email.recipients}
-                    onChange={(e) => handleNestedInputChange('notifications', 'email', 'recipients', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Telegram Settings */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-800">Telegram Notifications</h3>
+                <h3 className="text-lg font-medium text-gray-800">Notifiche Telegram</h3>
                 <label className="flex items-center">
                   <input
                     type="checkbox"
@@ -254,7 +228,7 @@ const Settings = () => {
                     onChange={(e) => handleNestedInputChange('notifications', 'telegram', 'enabled', e.target.checked)}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="ml-2 text-sm text-gray-700">Enable</span>
+                  <span className="ml-2 text-sm text-gray-700">Abilita</span>
                 </label>
               </div>
               
@@ -266,6 +240,7 @@ const Settings = () => {
                     value={config.notifications.telegram.botToken}
                     onChange={(e) => handleNestedInputChange('notifications', 'telegram', 'botToken', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="123456789:ABCdefGHIjklMNOpqrSTUvwxyz"
                   />
                 </div>
                 <div>
@@ -275,6 +250,36 @@ const Settings = () => {
                     value={config.notifications.telegram.chatId}
                     onChange={(e) => handleNestedInputChange('notifications', 'telegram', 'chatId', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="-1001234567890"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Email Settings */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-800">Notifiche Email</h3>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={config.notifications.email.enabled}
+                    onChange={(e) => handleNestedInputChange('notifications', 'email', 'enabled', e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Abilita</span>
+                </label>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Destinatari (separati da virgola)</label>
+                  <input
+                    type="text"
+                    value={config.notifications.email.recipients}
+                    onChange={(e) => handleNestedInputChange('notifications', 'email', 'recipients', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="admin@company.com, security@company.com"
                   />
                 </div>
               </div>
@@ -283,7 +288,7 @@ const Settings = () => {
 
           {/* Alert Rules */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Alert Thresholds</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">Soglie di Alert</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
@@ -332,7 +337,7 @@ const Settings = () => {
               className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
             >
               <Save className="w-5 h-5" />
-              <span>Save Configuration</span>
+              <span>Salva Configurazione</span>
             </button>
           </div>
         </div>
