@@ -32,6 +32,7 @@ export class GraylogService {
   private config: GraylogConfig;
   private axiosInstance: AxiosInstance;
   private requestCount: number = 0;
+  private requestTimings: Map<string, number> = new Map();
 
   constructor(config: GraylogConfig) {
     this.config = config;
@@ -58,7 +59,11 @@ export class GraylogService {
     this.axiosInstance.interceptors.request.use(
       (config) => {
         const startTime = Date.now();
-        config.metadata = { startTime };
+        const requestId = `${this.requestCount}_${startTime}`;
+        this.requestTimings.set(requestId, startTime);
+        
+        // Store request ID in headers for tracking
+        config.headers['X-Request-ID'] = requestId;
         
         // Aggiungi autenticazione
         if (this.config.apiToken && this.config.apiToken.trim() !== '') {
@@ -91,8 +96,14 @@ export class GraylogService {
     this.axiosInstance.interceptors.response.use(
       (response: AxiosResponse) => {
         const endTime = Date.now();
-        const startTime = response.config.metadata?.startTime || endTime;
+        const requestId = response.config.headers['X-Request-ID'] as string;
+        const startTime = this.requestTimings.get(requestId) || endTime;
         const duration = endTime - startTime;
+        
+        // Cleanup timing data
+        if (requestId) {
+          this.requestTimings.delete(requestId);
+        }
 
         // Registra metriche di performance
         performanceMetrics.recordApiCall({
@@ -114,8 +125,14 @@ export class GraylogService {
       },
       (error) => {
         const endTime = Date.now();
-        const startTime = error.config?.metadata?.startTime || endTime;
+        const requestId = error.config?.headers['X-Request-ID'] as string;
+        const startTime = this.requestTimings.get(requestId) || endTime;
         const duration = endTime - startTime;
+        
+        // Cleanup timing data
+        if (requestId) {
+          this.requestTimings.delete(requestId);
+        }
 
         // Registra metriche di errore
         performanceMetrics.recordApiCall({
