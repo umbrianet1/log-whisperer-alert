@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     proxy: {
       '/api/graylog': {
-        target: 'http://localhost:9000',
+        target: 'http://192.168.1.136:9000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/graylog/, '/api'),
         configure: (proxy, options) => {
