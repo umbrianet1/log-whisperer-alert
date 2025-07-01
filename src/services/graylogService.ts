@@ -35,12 +35,21 @@ export class GraylogService {
   private requestTimings: Map<string, number> = new Map();
 
   constructor(config: GraylogConfig) {
+    console.log('🔧 Initializing GraylogService with config:', {
+      url: config.url,
+      username: config.username,
+      hasPassword: !!config.password,
+      hasApiToken: !!config.apiToken
+    });
+    
     this.config = config;
     this.axiosInstance = this.createAxiosInstance();
     this.setupInterceptors();
   }
 
   private createAxiosInstance(): AxiosInstance {
+    console.log('🌐 Creating axios instance with baseURL:', '/api/graylog');
+    
     const instance = axios.create({
       baseURL: '/api/graylog',
       timeout: 30000,
@@ -67,16 +76,28 @@ export class GraylogService {
         
         // Aggiungi autenticazione
         if (this.config.apiToken && this.config.apiToken.trim() !== '') {
+          console.log('🔑 Using API Token authentication');
           logger.debug('Using API Token authentication (Basic Auth format)');
           const credentials = btoa(`${this.config.apiToken}:`);
           config.headers.Authorization = `Basic ${credentials}`;
         } else if (this.config.username && this.config.password) {
+          console.log('🔑 Using Basic authentication for user:', this.config.username);
           logger.debug('Using Basic authentication', { username: this.config.username });
           const credentials = btoa(`${this.config.username}:${this.config.password}`);
           config.headers.Authorization = `Basic ${credentials}`;
+        } else {
+          console.warn('⚠️ No authentication configured!');
         }
 
         this.requestCount++;
+        console.log('📤 Making request:', {
+          method: config.method?.toUpperCase(),
+          url: config.url,
+          fullUrl: `${config.baseURL}${config.url}`,
+          requestId: this.requestCount,
+          hasAuth: !!config.headers.Authorization
+        });
+
         logger.info('Graylog API Request', {
           method: config.method?.toUpperCase(),
           url: config.url,
@@ -87,6 +108,7 @@ export class GraylogService {
         return config;
       },
       (error) => {
+        console.error('❌ Request interceptor error:', error.message);
         logger.error('Request interceptor error', { error: error.message });
         return Promise.reject(error);
       }
@@ -104,6 +126,14 @@ export class GraylogService {
         if (requestId) {
           this.requestTimings.delete(requestId);
         }
+
+        console.log('✅ Response received:', {
+          status: response.status,
+          url: response.config.url,
+          duration: `${duration}ms`,
+          dataSize: JSON.stringify(response.data).length,
+          data: response.data
+        });
 
         // Registra metriche di performance
         performanceMetrics.recordApiCall({
@@ -134,6 +164,15 @@ export class GraylogService {
           this.requestTimings.delete(requestId);
         }
 
+        console.error('❌ Response error:', {
+          status: error.response?.status,
+          url: error.config?.url,
+          duration: `${duration}ms`,
+          error: error.message,
+          response: error.response?.data,
+          fullError: error
+        });
+
         // Registra metriche di errore
         performanceMetrics.recordApiCall({
           endpoint: error.config?.url || 'unknown',
@@ -158,6 +197,7 @@ export class GraylogService {
 
   async testConnection(): Promise<boolean> {
     try {
+      console.log('🔍 Testing Graylog connection...');
       logger.info('Testing Graylog connection', {
         url: this.config.url,
         hasApiToken: !!this.config.apiToken,
@@ -166,6 +206,7 @@ export class GraylogService {
 
       const response = await this.axiosInstance.get('/system');
       
+      console.log('✅ Graylog connection successful!', response.data);
       logger.info('Graylog connection successful', {
         status: response.status,
         serverInfo: response.data
@@ -173,6 +214,13 @@ export class GraylogService {
 
       return true;
     } catch (error: any) {
+      console.error('❌ Graylog connection failed:', {
+        error: error.message,
+        status: error.response?.status,
+        response: error.response?.data,
+        config: error.config
+      });
+      
       logger.error('Graylog connection failed', {
         error: error.message,
         status: error.response?.status,
@@ -185,6 +233,7 @@ export class GraylogService {
 
   async searchMessages(query: string = '*', timeRange: number = 300): Promise<GraylogMessage[]> {
     try {
+      console.log('🔍 Searching Graylog messages...', { query, timeRange });
       logger.debug('Searching Graylog messages', { query, timeRange });
 
       const response = await this.axiosInstance.get<GraylogSearchResponse>('/search/universal/relative', {
@@ -196,6 +245,14 @@ export class GraylogService {
         }
       });
 
+      console.log('✅ Graylog search completed:', {
+        query,
+        totalResults: response.data.total_results,
+        messagesReturned: response.data.messages?.length || 0,
+        searchTime: `${response.data.time}ms`,
+        messages: response.data.messages
+      });
+
       logger.info('Graylog search completed', {
         query,
         totalResults: response.data.total_results,
@@ -205,6 +262,14 @@ export class GraylogService {
 
       return response.data.messages || [];
     } catch (error: any) {
+      console.error('❌ Graylog search failed:', {
+        query,
+        timeRange,
+        error: error.message,
+        status: error.response?.status,
+        response: error.response?.data
+      });
+
       logger.error('Graylog search failed', {
         query,
         timeRange,
