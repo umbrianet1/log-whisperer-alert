@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import { Save, TestTube, Check, AlertCircle } from 'lucide-react';
-import { ConfigService, AppConfig } from '../services/configService';
+import { Save, TestTube, Check, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import { ConfigService, AppConfig, NotificationRule } from '../services/configService';
 import { GraylogService } from '../services/graylogService';
 import { AIService } from '../services/aiService';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +34,54 @@ const Settings = () => {
           ...prev[section][subsection],
           [field]: value
         }
+      }
+    }));
+  };
+
+  const addNotificationRule = () => {
+    const newRule: NotificationRule = {
+      id: `rule_${Date.now()}`,
+      name: `Regola ${config.notifications.rules.length + 1}`,
+      enabled: true,
+      matchString: '',
+      email: {
+        enabled: false,
+        recipients: ''
+      },
+      telegram: {
+        enabled: false,
+        botToken: '',
+        chatId: ''
+      }
+    };
+
+    setConfig(prev => ({
+      ...prev,
+      notifications: {
+        ...prev.notifications,
+        rules: [...prev.notifications.rules, newRule]
+      }
+    }));
+  };
+
+  const removeNotificationRule = (ruleId: string) => {
+    setConfig(prev => ({
+      ...prev,
+      notifications: {
+        ...prev.notifications,
+        rules: prev.notifications.rules.filter(rule => rule.id !== ruleId)
+      }
+    }));
+  };
+
+  const updateNotificationRule = (ruleId: string, updates: Partial<NotificationRule>) => {
+    setConfig(prev => ({
+      ...prev,
+      notifications: {
+        ...prev.notifications,
+        rules: prev.notifications.rules.map(rule =>
+          rule.id === ruleId ? { ...rule, ...updates } : rule
+        )
       }
     }));
   };
@@ -231,10 +278,10 @@ const Settings = () => {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">Impostazioni Notifiche</h2>
             
-            {/* Telegram Settings */}
+            {/* Global Telegram Settings */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-800">Notifiche Telegram</h3>
+                <h3 className="text-lg font-medium text-gray-800">Notifiche Telegram Globali</h3>
                 <label className="flex items-center">
                   <input
                     type="checkbox"
@@ -270,10 +317,10 @@ const Settings = () => {
               </div>
             </div>
 
-            {/* Email Settings */}
-            <div>
+            {/* Global Email Settings */}
+            <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-800">Notifiche Email</h3>
+                <h3 className="text-lg font-medium text-gray-800">Notifiche Email Globali</h3>
                 <label className="flex items-center">
                   <input
                     type="checkbox"
@@ -298,49 +345,132 @@ const Settings = () => {
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Alert Rules */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Soglie di Alert</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">CPU Usage (%)</label>
-                <input
-                  type="number"
-                  value={config.alertRules.cpuThreshold}
-                  onChange={(e) => handleInputChange('alertRules', 'cpuThreshold', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+            {/* Notification Rules */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-800">Regole di Notifica Condizionali</h3>
+                <button
+                  onClick={addNotificationRule}
+                  className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Aggiungi Regola</span>
+                </button>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Memory Usage (%)</label>
-                <input
-                  type="number"
-                  value={config.alertRules.memoryThreshold}
-                  onChange={(e) => handleInputChange('alertRules', 'memoryThreshold', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Disk Usage (%)</label>
-                <input
-                  type="number"
-                  value={config.alertRules.diskThreshold}
-                  onChange={(e) => handleInputChange('alertRules', 'diskThreshold', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Failed Logins</label>
-                <input
-                  type="number"
-                  value={config.alertRules.failedLoginsThreshold}
-                  onChange={(e) => handleInputChange('alertRules', 'failedLoginsThreshold', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                Crea regole per inviare notifiche specifiche quando i log contengono determinate stringhe (es. IP, hostname, errori specifici)
+              </p>
+
+              {config.notifications.rules.map((rule) => (
+                <div key={rule.id} className="border border-gray-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-4">
+                      <input
+                        type="text"
+                        value={rule.name}
+                        onChange={(e) => updateNotificationRule(rule.id, { name: e.target.value })}
+                        className="font-medium px-2 py-1 border border-gray-300 rounded"
+                        placeholder="Nome regola"
+                      />
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={rule.enabled}
+                          onChange={(e) => updateNotificationRule(rule.id, { enabled: e.target.checked })}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">Attiva</span>
+                      </label>
+                    </div>
+                    <button
+                      onClick={() => removeNotificationRule(rule.id)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Stringa da cercare nei log</label>
+                    <input
+                      type="text"
+                      value={rule.matchString}
+                      onChange={(e) => updateNotificationRule(rule.id, { matchString: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="es. 192.168.1.1, ERROR, failed login, etc."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Rule Telegram Settings */}
+                    <div>
+                      <div className="flex items-center mb-2">
+                        <input
+                          type="checkbox"
+                          checked={rule.telegram?.enabled || false}
+                          onChange={(e) => updateNotificationRule(rule.id, { 
+                            telegram: { ...rule.telegram, enabled: e.target.checked, botToken: rule.telegram?.botToken || '', chatId: rule.telegram?.chatId || '' }
+                          })}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="ml-2 text-sm font-medium text-gray-700">Telegram</span>
+                      </div>
+                      <div className="space-y-2">
+                        <input
+                          type="password"
+                          value={rule.telegram?.botToken || ''}
+                          onChange={(e) => updateNotificationRule(rule.id, { 
+                            telegram: { ...rule.telegram, enabled: rule.telegram?.enabled || false, botToken: e.target.value, chatId: rule.telegram?.chatId || '' }
+                          })}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                          placeholder="Bot Token"
+                        />
+                        <input
+                          type="text"
+                          value={rule.telegram?.chatId || ''}
+                          onChange={(e) => updateNotificationRule(rule.id, { 
+                            telegram: { ...rule.telegram, enabled: rule.telegram?.enabled || false, botToken: rule.telegram?.botToken || '', chatId: e.target.value }
+                          })}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                          placeholder="Chat ID"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Rule Email Settings */}
+                    <div>
+                      <div className="flex items-center mb-2">
+                        <input
+                          type="checkbox"
+                          checked={rule.email?.enabled || false}
+                          onChange={(e) => updateNotificationRule(rule.id, { 
+                            email: { enabled: e.target.checked, recipients: rule.email?.recipients || '' }
+                          })}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="ml-2 text-sm font-medium text-gray-700">Email</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={rule.email?.recipients || ''}
+                        onChange={(e) => updateNotificationRule(rule.id, { 
+                          email: { enabled: rule.email?.enabled || false, recipients: e.target.value }
+                        })}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                        placeholder="email1@example.com, email2@example.com"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {config.notifications.rules.length === 0 && (
+                <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
+                  <p>Nessuna regola configurata</p>
+                  <p className="text-sm">Aggiungi regole per notifiche condizionali basate sul contenuto dei log</p>
+                </div>
+              )}
             </div>
           </div>
 

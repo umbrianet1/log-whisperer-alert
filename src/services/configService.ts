@@ -1,4 +1,20 @@
 
+export interface NotificationRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  matchString: string;
+  email?: {
+    enabled: boolean;
+    recipients: string;
+  };
+  telegram?: {
+    enabled: boolean;
+    botToken: string;
+    chatId: string;
+  };
+}
+
 export interface AppConfig {
   graylog: {
     url: string;
@@ -26,12 +42,7 @@ export interface AppConfig {
       botToken: string;
       chatId: string;
     };
-  };
-  alertRules: {
-    cpuThreshold: number;
-    memoryThreshold: number;
-    diskThreshold: number;
-    failedLoginsThreshold: number;
+    rules: NotificationRule[];
   };
 }
 
@@ -61,13 +72,8 @@ const DEFAULT_CONFIG: AppConfig = {
       enabled: false,
       botToken: '',
       chatId: ''
-    }
-  },
-  alertRules: {
-    cpuThreshold: 85,
-    memoryThreshold: 90,
-    diskThreshold: 95,
-    failedLoginsThreshold: 10
+    },
+    rules: []
   }
 };
 

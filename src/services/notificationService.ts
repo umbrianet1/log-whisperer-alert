@@ -1,4 +1,6 @@
 
+import { NotificationRule } from './configService';
+
 interface EmailConfig {
   enabled: boolean;
   smtp: string;
@@ -17,6 +19,7 @@ interface TelegramConfig {
 interface NotificationConfig {
   email: EmailConfig;
   telegram: TelegramConfig;
+  rules: NotificationRule[];
 }
 
 export interface AlertNotification {
@@ -26,6 +29,7 @@ export interface AlertNotification {
   level: 'critical' | 'warning' | 'info';
   message: string;
   aiSuggestion: string;
+  logContent?: string;
 }
 
 export class NotificationService {
@@ -35,8 +39,14 @@ export class NotificationService {
     this.config = config;
   }
 
-  async sendTelegramNotification(alert: AlertNotification): Promise<boolean> {
-    if (!this.config.telegram.enabled || !this.config.telegram.botToken) {
+  private getMatchingRules(logContent: string): NotificationRule[] {
+    return this.config.rules.filter(rule => 
+      rule.enabled && logContent.includes(rule.matchString)
+    );
+  }
+
+  async sendTelegramNotification(alert: AlertNotification, telegramConfig: TelegramConfig): Promise<boolean> {
+    if (!telegramConfig.enabled || !telegramConfig.botToken) {
       return false;
     }
 
@@ -61,13 +71,13 @@ ${alert.aiSuggestion}${replyInstructions}
     `.trim();
 
     try {
-      const response = await fetch(`https://api.telegram.org/bot${this.config.telegram.botToken}/sendMessage`, {
+      const response = await fetch(`https://api.telegram.org/bot${telegramConfig.botToken}/sendMessage`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          chat_id: this.config.telegram.chatId,
+          chat_id: telegramConfig.chatId,
           text: message,
           parse_mode: 'Markdown'
         })
@@ -80,11 +90,7 @@ ${alert.aiSuggestion}${replyInstructions}
     }
   }
 
-  async sendEmailNotification(alert: AlertNotification): Promise<boolean> {
-    if (!this.config.email.enabled) {
-      return false;
-    }
-
+  async sendEmailNotification(alert: AlertNotification, recipients: string): Promise<boolean> {
     const replyInstructions = `
     
 === RISPONDI A QUESTA EMAIL PER INTERAGIRE CON L'AI ===
@@ -93,10 +99,8 @@ Alert ID: ${alert.id}
 =====================================================
     `;
 
-    // Per l'email, in un ambiente reale useresti un servizio backend
-    // Qui simuliamo con un webhook o servizio esterno come EmailJS
     console.log('Email notification would be sent:', {
-      to: this.config.email.recipients,
+      to: recipients,
       subject: `LogGuard AI Alert - ${alert.level.toUpperCase()} on ${alert.host}`,
       body: `
         Alert Details:
@@ -110,18 +114,33 @@ Alert ID: ${alert.id}
       `
     });
 
-    return true; // Simulazione successo
+    return true;
   }
 
   async sendAlert(alert: AlertNotification): Promise<void> {
-    const promises = [];
+    const promises: Promise<boolean>[] = [];
+    const logContent = alert.logContent || alert.message;
 
+    // Notifiche globali
     if (this.config.telegram.enabled) {
-      promises.push(this.sendTelegramNotification(alert));
+      promises.push(this.sendTelegramNotification(alert, this.config.telegram));
     }
 
     if (this.config.email.enabled) {
-      promises.push(this.sendEmailNotification(alert));
+      promises.push(this.sendEmailNotification(alert, this.config.email.recipients));
+    }
+
+    // Notifiche condizionali basate su regole
+    const matchingRules = this.getMatchingRules(logContent);
+    
+    for (const rule of matchingRules) {
+      if (rule.telegram?.enabled && rule.telegram.botToken) {
+        promises.push(this.sendTelegramNotification(alert, rule.telegram));
+      }
+      
+      if (rule.email?.enabled && rule.email.recipients) {
+        promises.push(this.sendEmailNotification(alert, rule.email.recipients));
+      }
     }
 
     await Promise.all(promises);
