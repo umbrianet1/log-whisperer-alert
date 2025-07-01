@@ -27,15 +27,20 @@ export class GraylogService {
   private getAuthHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'X-Requested-By': 'LogGuard-AI'
+      'X-Requested-By': 'LogGuard-AI',
+      'Accept': 'application/json'
     };
 
     // Usa API token se disponibile, altrimenti username/password
     if (this.config.apiToken && this.config.apiToken.trim() !== '') {
+      console.log('Using API Token authentication');
       headers['Authorization'] = `Bearer ${this.config.apiToken}`;
     } else if (this.config.username && this.config.password) {
+      console.log('Using Basic authentication with username:', this.config.username);
       const credentials = btoa(`${this.config.username}:${this.config.password}`);
       headers['Authorization'] = `Basic ${credentials}`;
+    } else {
+      console.warn('No authentication credentials provided');
     }
 
     return headers;
@@ -44,22 +49,47 @@ export class GraylogService {
   async testConnection(): Promise<boolean> {
     try {
       console.log('Testing Graylog connection via proxy...');
+      console.log('Using config:', {
+        url: this.config.url,
+        username: this.config.username,
+        hasPassword: !!this.config.password,
+        hasApiToken: !!this.config.apiToken
+      });
+      
+      const headers = this.getAuthHeaders();
+      console.log('Request headers:', { ...headers, Authorization: headers.Authorization ? '[REDACTED]' : 'None' });
       
       // Usa il proxy invece dell'URL diretto
       const response = await fetch('/api/graylog/system', {
         method: 'GET',
-        headers: this.getAuthHeaders()
+        headers
       });
 
       console.log('Graylog response status:', response.status);
+      console.log('Graylog response headers:', Object.fromEntries(response.headers.entries()));
       
       if (response.ok) {
-        const data = await response.json();
-        console.log('Graylog system info:', data);
+        const data = await response.text();
+        console.log('Graylog system response:', data);
+        try {
+          const jsonData = JSON.parse(data);
+          console.log('Graylog system info:', jsonData);
+        } catch (e) {
+          console.log('Response is not JSON, but connection successful');
+        }
         return true;
+      } 
+      
+      if (response.status === 401) {
+        console.error('Authentication failed - Invalid credentials');
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+      } else {
+        console.error('Graylog connection failed:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
       }
       
-      console.error('Graylog connection failed:', response.status, response.statusText);
       return false;
     } catch (error) {
       console.error('Error testing Graylog connection:', error);
@@ -82,7 +112,10 @@ export class GraylogService {
       });
 
       if (!response.ok) {
-        throw new Error(`Search failed: ${response.status}`);
+        if (response.status === 401) {
+          throw new Error('Authentication failed - Check your credentials');
+        }
+        throw new Error(`Search failed: ${response.status} - ${response.statusText}`);
       }
 
       const data = await response.json();
