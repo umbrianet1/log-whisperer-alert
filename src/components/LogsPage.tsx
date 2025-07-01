@@ -92,7 +92,7 @@ const LogsPage = () => {
     if (!graylogService) return;
 
     try {
-      const messages = await graylogService.getMessages('*', 'PT1H');
+      const messages = await graylogService.searchMessages('*', 3600); // 1 ora in secondi
       const logEntries: LogEntry[] = messages.map(message => ({
         id: message._id,
         timestamp: message.timestamp,

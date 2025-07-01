@@ -7,6 +7,7 @@ export interface GraylogConfig {
 }
 
 export interface GraylogMessage {
+  _id: string;
   timestamp: string;
   message: string;
   full_message: string;
