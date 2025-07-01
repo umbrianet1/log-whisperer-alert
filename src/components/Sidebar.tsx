@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
@@ -9,7 +8,8 @@ import {
   Shield, 
   Server,
   Bell,
-  FileText
+  FileText,
+  MessageSquare
 } from 'lucide-react';
 
 const navigation = [
@@ -20,6 +20,12 @@ const navigation = [
   { name: 'Hosts', href: '/hosts', icon: Server },
   { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Settings', href: '/settings', icon: Settings },
+  {
+    name: 'Conversazioni AI',
+    href: '/ai-conversations',
+    icon: MessageSquare,
+    current: location.pathname === '/ai-conversations'
+  },
 ];
 
 const Sidebar = () => {

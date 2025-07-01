@@ -40,6 +40,13 @@ export class NotificationService {
       return false;
     }
 
+    const replyInstructions = `
+
+💬 *Puoi rispondere a questo messaggio per interagire con l'AI*
+L'AI processerà la tua risposta e fornirà assistenza aggiuntiva.
+
+🔗 Alert ID: \`${alert.id}\``;
+
     const message = `
 🚨 *LogGuard AI Alert*
 
@@ -50,7 +57,7 @@ export class NotificationService {
 *Issue:* ${alert.message}
 
 🤖 *AI Suggestion:*
-${alert.aiSuggestion}
+${alert.aiSuggestion}${replyInstructions}
     `.trim();
 
     try {
@@ -78,6 +85,14 @@ ${alert.aiSuggestion}
       return false;
     }
 
+    const replyInstructions = `
+    
+=== RISPONDI A QUESTA EMAIL PER INTERAGIRE CON L'AI ===
+L'AI processerà la tua risposta e fornirà assistenza aggiuntiva.
+Alert ID: ${alert.id}
+=====================================================
+    `;
+
     // Per l'email, in un ambiente reale useresti un servizio backend
     // Qui simuliamo con un webhook o servizio esterno come EmailJS
     console.log('Email notification would be sent:', {
@@ -86,12 +101,12 @@ ${alert.aiSuggestion}
       body: `
         Alert Details:
         - Level: ${alert.level.toUpperCase()}
-        - Host: ${alert.host}
+        - Host: ${alert.host}  
         - Timestamp: ${alert.timestamp}
         - Message: ${alert.message}
         
         AI Suggestion:
-        ${alert.aiSuggestion}
+        ${alert.aiSuggestion}${replyInstructions}
       `
     });
 
