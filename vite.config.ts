@@ -9,6 +9,8 @@ export default defineConfig(({ mode }) => {
   // Legge l'URL di Graylog dalle variabili d'ambiente, con fallback a localhost
   const graylogUrl = process.env.VITE_GRAYLOG_URL || 'http://localhost:9000';
   
+  console.log(`🔗 Configurazione proxy Graylog: ${graylogUrl}`);
+  
   return {
     server: {
       host: "::",
@@ -21,6 +23,10 @@ export default defineConfig(({ mode }) => {
           configure: (proxy, options) => {
             proxy.on('proxyReq', (proxyReq, req, res) => {
               console.log('Proxying request to Graylog:', graylogUrl + req.url);
+            });
+            proxy.on('error', (err, req, res) => {
+              console.error('Proxy error:', err.message);
+              console.error('Target URL:', graylogUrl);
             });
           }
         }

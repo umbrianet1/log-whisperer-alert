@@ -142,7 +142,8 @@ const Settings = () => {
       // Se l'URL di Graylog è cambiato, mostra la notifica di riavvio
       if (config.graylog.url !== previousGraylogUrl) {
         showRestartNotification();
-        sessionStorage.setItem('graylog_proxy_url', config.graylog.url);
+        // Salva l'URL per il prossimo riavvio
+        localStorage.setItem('graylog_proxy_url', config.graylog.url);
       }
       
       toast({
