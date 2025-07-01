@@ -1,4 +1,3 @@
-
 interface GraylogConfig {
   url: string;
   username: string;
@@ -85,7 +84,7 @@ export class GraylogService {
     }
   }
 
-  async streamMessages(callback: (message: GraylogMessage) => void): Promise<void> {
+  async streamMessages(callback: (message: GraylogMessage) => void): Promise<() => void> {
     // Simulazione di streaming - in produzione useresti WebSocket o Server-Sent Events
     const pollInterval = setInterval(async () => {
       try {
