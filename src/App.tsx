@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +9,7 @@ import Dashboard from "./components/Dashboard";
 import Settings from "./components/Settings";
 import LogsPage from "./components/LogsPage";
 import AIConversations from './components/AIConversations';
+import PerformanceMetrics from './components/PerformanceMetrics';
 
 const queryClient = new QueryClient();
 
@@ -28,6 +30,7 @@ const App = () => (
               <Route path="/security" element={<Dashboard />} />
               <Route path="/hosts" element={<Dashboard />} />
               <Route path="/reports" element={<Dashboard />} />
+              <Route path="/performance" element={<PerformanceMetrics />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
           </div>

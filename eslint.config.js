@@ -1,11 +1,13 @@
+
 import js from "@eslint/js";
 import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
+import jest from "eslint-plugin-jest";
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  { ignores: ["dist", "coverage", "node_modules"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -23,7 +25,35 @@ export default tseslint.config(
         "warn",
         { allowConstantExport: true },
       ],
-      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": "error",
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/prefer-const": "error",
+      "@typescript-eslint/no-empty-function": "warn",
+      "no-console": "warn",
+      "prefer-const": "error",
+      "no-var": "error",
+      "object-shorthand": "error",
+      "prefer-arrow-callback": "error",
+    },
+  },
+  {
+    files: ["**/*.test.{ts,tsx}", "**/__tests__/**/*.{ts,tsx}"],
+    plugins: {
+      jest,
+    },
+    rules: {
+      ...jest.configs.recommended.rules,
+      "jest/prefer-expect-assertions": "off",
+      "jest/no-disabled-tests": "warn",
+      "jest/no-focused-tests": "error",
+      "jest/no-identical-title": "error",
+      "jest/prefer-to-have-length": "warn",
+      "jest/valid-expect": "error",
+    },
+    languageOptions: {
+      globals: {
+        ...globals.jest,
+      },
     },
   }
 );
