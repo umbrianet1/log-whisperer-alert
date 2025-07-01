@@ -8,7 +8,8 @@ import {
   Clock,
   TrendingUp,
   Shield,
-  Zap
+  Zap,
+  Bell
 } from 'lucide-react';
 
 interface Alert {
