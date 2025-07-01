@@ -31,10 +31,12 @@ export class GraylogService {
       'Accept': 'application/json'
     };
 
-    // Usa API token se disponibile, altrimenti username/password
+    // Usa API token se disponibile (formato corretto secondo la documentazione Graylog)
     if (this.config.apiToken && this.config.apiToken.trim() !== '') {
-      console.log('Using API Token authentication');
-      headers['Authorization'] = `Bearer ${this.config.apiToken}`;
+      console.log('Using API Token authentication (Basic Auth format)');
+      // Per gli API token, il token è l'username e la password è vuota
+      const credentials = btoa(`${this.config.apiToken}:`);
+      headers['Authorization'] = `Basic ${credentials}`;
     } else if (this.config.username && this.config.password) {
       console.log('Using Basic authentication with username:', this.config.username);
       const credentials = btoa(`${this.config.username}:${this.config.password}`);
