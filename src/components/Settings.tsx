@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Save, TestTube, Check, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import { Save, TestTube, Check, AlertCircle, Plus, Trash2, Info } from 'lucide-react';
 import { ConfigService, AppConfig, NotificationRule } from '../services/configService';
 import { GraylogService } from '../services/graylogService';
 import { AIService } from '../services/aiService';
@@ -160,6 +161,8 @@ const Settings = () => {
     </button>
   );
 
+  const hasApiToken = config.graylog.apiToken.trim() !== '';
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="max-w-4xl mx-auto">
@@ -176,43 +179,92 @@ const Settings = () => {
               <TestButton service="graylog" label="Connessione" onTest={testGraylogConnection} />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">URL Server</label>
-                <input
-                  type="url"
-                  value={config.graylog.url}
-                  onChange={(e) => handleInputChange('graylog', 'url', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="http://localhost:9000"
-                />
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">URL Server</label>
+              <input
+                type="url"
+                value={config.graylog.url}
+                onChange={(e) => handleInputChange('graylog', 'url', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="http://localhost:9000"
+              />
+            </div>
+
+            {/* Authentication Methods */}
+            <div className="space-y-6">
+              {/* API Token Method (Recommended) */}
+              <div className="border border-green-200 rounded-lg p-4 bg-green-50">
+                <div className="flex items-center space-x-2 mb-3">
+                  <h3 className="text-lg font-medium text-gray-900">Metodo 1: API Token</h3>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    Raccomandato
+                  </span>
+                </div>
+                <div className="flex items-start space-x-2 mb-3">
+                  <Info className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-green-700">
+                    Più sicuro e moderno. Se configurato, verrà usato questo invece di username/password.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">API Token</label>
+                  <input
+                    type="password"
+                    value={config.graylog.apiToken}
+                    onChange={(e) => handleInputChange('graylog', 'apiToken', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Inserisci il tuo API token di Graylog"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
-                <input
-                  type="text"
-                  value={config.graylog.username}
-                  onChange={(e) => handleInputChange('graylog', 'username', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-                <input
-                  type="password"
-                  value={config.graylog.password}
-                  onChange={(e) => handleInputChange('graylog', 'password', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">API Token (opzionale)</label>
-                <input
-                  type="password"
-                  value={config.graylog.apiToken}
-                  onChange={(e) => handleInputChange('graylog', 'apiToken', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+
+              {/* Username/Password Method (Fallback) */}
+              <div className={`border rounded-lg p-4 ${hasApiToken ? 'border-gray-200 bg-gray-50' : 'border-orange-200 bg-orange-50'}`}>
+                <div className="flex items-center space-x-2 mb-3">
+                  <h3 className="text-lg font-medium text-gray-900">Metodo 2: Username e Password</h3>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    hasApiToken ? 'bg-gray-100 text-gray-600' : 'bg-orange-100 text-orange-800'
+                  }`}>
+                    {hasApiToken ? 'Non utilizzato' : 'Fallback'}
+                  </span>
+                </div>
+                <div className="flex items-start space-x-2 mb-3">
+                  <Info className={`w-4 h-4 mt-0.5 flex-shrink-0 ${hasApiToken ? 'text-gray-500' : 'text-orange-600'}`} />
+                  <p className={`text-sm ${hasApiToken ? 'text-gray-600' : 'text-orange-700'}`}>
+                    {hasApiToken 
+                      ? 'Disabilitato perché è configurato l\'API Token sopra.'
+                      : 'Usato solo se l\'API Token non è configurato. Meno sicuro.'
+                    }
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                    <input
+                      type="text"
+                      value={config.graylog.username}
+                      onChange={(e) => handleInputChange('graylog', 'username', e.target.value)}
+                      disabled={hasApiToken}
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        hasApiToken ? 'bg-gray-100 text-gray-500' : ''
+                      }`}
+                      placeholder="admin"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input
+                      type="password"
+                      value={config.graylog.password}
+                      onChange={(e) => handleInputChange('graylog', 'password', e.target.value)}
+                      disabled={hasApiToken}
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        hasApiToken ? 'bg-gray-100 text-gray-500' : ''
+                      }`}
+                      placeholder="La tua password"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
